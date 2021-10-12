@@ -89,7 +89,8 @@ class Model(object):
 #        # TODO: Use the GP posterior to form your predictions here
 #        predictions = gp_mean
         y = self.model.predict(test_x)
-
+        predict_safe = (y < THRESHOLD).astype(int)
+        y += 5 * predict_safe
 
         return y
 
@@ -100,8 +101,8 @@ class Model(object):
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
         train_x, train_y = self.preprocess(train_x, train_y, 1500)
-        k = ker.Matern(length_scale=0.01, nu=2.5) + \
-            ker.WhiteKernel(noise_level=1e-05)
+        k = ker.Matern(length_scale=0.01, nu=1.25) + \
+            ker.WhiteKernel(noise_level=1e-09)
 
         gpr = gp.GaussianProcessRegressor(kernel=k, alpha=0.01, n_restarts_optimizer=20, random_state=42, normalize_y=True)
         noisyMat_gpr = pipeline.Pipeline([
