@@ -107,10 +107,10 @@ class Model(object):
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
         train_x, train_y = self.preprocess(train_x, train_y, 5000)
-        k = ker.Matern(length_scale=0.01, nu=1.25) + \
-            ker.WhiteKernel(noise_level=1e-7)
+        k = ker.Matern(length_scale=0.01, nu=1.5) + \
+            ker.WhiteKernel(noise_level=1e-9)
 
-        gpr = gp.GaussianProcessRegressor(kernel=k, alpha=0.01, n_restarts_optimizer=5, random_state=42, normalize_y=True)
+        gpr = gp.GaussianProcessRegressor(kernel=k, alpha=0.1, n_restarts_optimizer=1, random_state=15, normalize_y=True)
         noisyMat_gpr = pipeline.Pipeline([("scaler", self.scaler),("gpr", gpr)])
 
         print("Fitting noisy Matern GPR")
