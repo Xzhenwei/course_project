@@ -1,0 +1,6 @@
+In this project we first analyze the given train_X data set. We noticed that the size of the data is too large to perform the Gaussian process regressor, thus, we implement the preprocessor that randomly select a given number of samples.
+
+
+We then use a grid of parameters to fit the model by GaussianProcessRegressor() as our model and evaluate different parameters. We found the optimal parameter set and perform the GaussianProcessRegressor on them to obtain a fitting model.
+
+Lastly, in order to deal with the imbalanced cost function we use the information based on the predicted variance.

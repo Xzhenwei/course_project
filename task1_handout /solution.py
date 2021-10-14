@@ -43,27 +43,12 @@ class Model(object):
 
         # TODO: Add custom initialization for your model here if necessary=44):
 
-    def preprocess(self, train_x, train_y, num_samples):
-        """
-
-            We subsample the dense region to create a balanced dataset and at the same time deal with
-            the large scale of the dataset.
-
-            Args:
-                train_x (numpy.array):  training data points
-                train_y (numpy.array):  training labels
-                num_dense_labels (int): number of dense data points that should be subsampled
-            Returns:
-                train_x_s (numpy.array):    uniformly sampled and balanced training data
-                train_y_s (numpy.array):    corresponding training labels
-        """
-        #
-
+    def preprocess(self, train_x, train_y, num_samples)
+    
         data = np.concatenate([train_x, train_y.reshape(-1, 1)], axis=1)
-        
         np.random.shuffle(data)
 
-        # random shuffle datapoints in the dense region and select 150 to balance the data
+        # random shuffle datapoints
         train_x_sampled = data[:num_samples,:2]
         train_y_sampled = data[:num_samples,2]
         assert train_x_sampled.shape[0] == num_samples
