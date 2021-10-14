@@ -8,10 +8,11 @@ from sklearn import pipeline
 from sklearn.model_selection import train_test_split
 from sklearn.kernel_approximation import (RBFSampler, Nystroem)
 from sklearn.gaussian_process.kernels import Matern, RBF, RationalQuadratic, WhiteKernel
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler,FunctionTransformer
 from time import time
 import matplotlib.pyplot as plt
-
+from copy import copy
+from sklearn import svm
 
 # Set `EXTENDED_EVALUATION` to `True` in order to visualize your predictions.
 EXTENDED_EVALUATION = False
@@ -40,11 +41,11 @@ class Model(object):
         """
         self.rng = np.random.default_rng(seed=0)
 
-        # TODO: Add custom initialization for your model here if necessary
+        # TODO: Add custom initialization for your model here if necessary=44):
 
     def preprocess(self, train_x, train_y, num_samples):
         """
-        
+
             We subsample the dense region to create a balanced dataset and at the same time deal with
             the large scale of the dataset.
 
@@ -57,7 +58,9 @@ class Model(object):
                 train_y_s (numpy.array):    corresponding training labels
         """
         #
+
         data = np.concatenate([train_x, train_y.reshape(-1, 1)], axis=1)
+        
         np.random.shuffle(data)
 
         # random shuffle datapoints in the dense region and select 150 to balance the data
@@ -71,7 +74,7 @@ class Model(object):
 
         self.scaler = StandardScaler().fit(train_x_sampled)
 
-        return train_x_sampled, train_y_sampled
+        return train_x_sampled , train_y_sampled
         
     def predict(self, test_x):
         """
@@ -83,16 +86,19 @@ class Model(object):
         """
 
         # TODO: Use your GP to estimate the posterior mean and stddev for each location here
-#        gp_mean = np.zeros(x.shape[0], dtype=float)
-#        gp_std = np.zeros(x.shape[0], dtype=float)
-#        y = self.model.predict(test_x)
-#        # TODO: Use the GP posterior to form your predictions here
-#        predictions = gp_mean
-        y = self.model.predict(test_x)
-        predict_safe = (y < THRESHOLD).astype(int)
-        y += 5 * predict_safe
+        # gp_mean = np.zeros(x.shape[0], dtype=float)
+        # gp_std = np.zeros(x.shape[0], dtype=float)
+        gp_mean,gp_stddev = self.model.predict(test_x, return_std=True)
+        # TODO: Use the GP posterigor to form your predictions here
+        # predict_safe = (gp_mean < THRESHOLD).astype(int)
+        # y = gp_mean + predict_safe * 5
 
-        return y
+        # predict_safe = (gp_mean + 2* gp_stddev > THRESHOLD and THRESHOLD > gp_mean - 2* gp_stddev).astype(int)
+        y = gp_mean
+        np.where(np.logical_and(y + 2*gp_stddev >THRESHOLD , y - 2*gp_stddev <THRESHOLD),THRESHOLD,y)
+        # np.where(y - 2*gp_stddev <THRESHOLD,THRESHOLD,y )
+        # y = gp_mean - predict_safe*gp_mean + predict_safe*THRESHOLD
+        return y,gp_mean,gp_stddev
 
     def fit_model(self, train_x, train_y):
         """
@@ -100,22 +106,17 @@ class Model(object):
         :param train_x: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
-        train_x, train_y = self.preprocess(train_x, train_y, 1500)
+        train_x, train_y = self.preprocess(train_x, train_y, 5000)
         k = ker.Matern(length_scale=0.01, nu=1.25) + \
-            ker.WhiteKernel(noise_level=1e-09)
+            ker.WhiteKernel(noise_level=1e-7)
 
-        gpr = gp.GaussianProcessRegressor(kernel=k, alpha=0.01, n_restarts_optimizer=20, random_state=42, normalize_y=True)
-        noisyMat_gpr = pipeline.Pipeline([
-            ("scaler", self.scaler),
-            ("gpr", gpr)
-        ])
-
+        gpr = gp.GaussianProcessRegressor(kernel=k, alpha=0.01, n_restarts_optimizer=5, random_state=42, normalize_y=True)
+        noisyMat_gpr = pipeline.Pipeline([("scaler", self.scaler),("gpr", gpr)])
 
         print("Fitting noisy Matern GPR")
         start = time()
         noisyMat_gpr.fit(train_x, train_y)
         print("Took {} seconds".format(time() - start))
-
         self.model = noisyMat_gpr
 
 
