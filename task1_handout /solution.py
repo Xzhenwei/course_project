@@ -43,12 +43,12 @@ class Model(object):
 
         # TODO: Add custom initialization for your model here if necessary=44):
 
-    def preprocess(self, train_x, train_y, num_samples)
+    def preprocess(self, train_x, train_y, num_samples):
     
         data = np.concatenate([train_x, train_y.reshape(-1, 1)], axis=1)
+        
         np.random.shuffle(data)
 
-        # random shuffle datapoints
         train_x_sampled = data[:num_samples,:2]
         train_y_sampled = data[:num_samples,2]
         assert train_x_sampled.shape[0] == num_samples
@@ -91,7 +91,7 @@ class Model(object):
         :param train_x: Training features as a 2d NumPy float array of shape (NUM_SAMPLES, 2)
         :param train_y: Training pollution concentrations as a 1d NumPy float array of shape (NUM_SAMPLES,)
         """
-        train_x, train_y = self.preprocess(train_x, train_y, 5000)
+        train_x, train_y = self.preprocess(train_x, train_y, 15000)
         k = ker.Matern(length_scale=0.01, nu=1.5) + \
             ker.WhiteKernel(noise_level=1e-9)
 
