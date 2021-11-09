@@ -57,7 +57,7 @@ class Model(object):
     def __init__(self):
         # Hyperparameters and general parameters
         # You might want to play around with those
-        self.num_epochs = 3  # number of training epochs
+        self.num_epochs = 10  # number of training epochs
         self.batch_size = 128  # training batch size
         learning_rate = 1e-3  # training learning rates
         hidden_layers = (100, 100)  # for each entry, creates a hidden layer with the corresponding number of units
@@ -119,7 +119,7 @@ class Model(object):
                     nll_loss = F.nll_loss(F.log_softmax(current_logits, dim=1), batch_y, reduction='sum')
                     # reg_term = (log_var_post - log_prior)
                     loss = nll_loss #+ reg_term
-                    loss.backward()
+                    loss.backward(retain_graph=True)
                     # TODO: Implement Bayes by backprop training here
 
                 self.optimizer.step()
@@ -357,47 +357,47 @@ class UnivariateGaussian(ParameterDistribution):
 
 
 
-#class MultivariateDiagonalGaussian(ParameterDistribution):
-#    """
-#    Multivariate diagonal Gaussian distribution,
-#    i.e., assumes all elements to be independent Gaussians
-#    but with different means and standard deviations.
-#    This parameterizes the standard deviation via a parameter rho as
-#    sigma = softplus(rho).
-#    """
-#
-#    def __init__(self, mu: torch.Tensor, rho: torch.Tensor):
-#        super(MultivariateDiagonalGaussian, self).__init__()  # always make sure to include the super-class init call!
-#        assert mu.size() == rho.size()
-#        print (mu.size(),rho.size())
-#        self.mu = mu
-#        self.rho = rho
-#        self.sigma = torch.log(1+torch.exp(self.rho))
-#    def log_likelihood(self, values: torch.Tensor) -> torch.Tensor:
-#        # TODO: Implement this
-#        multi_normal_distribution = torch.distributions.Normal(self.mu, self.sigma)
-#        loglike = multi_normal_distribution.log_prob(values)
-#        return loglike
-#
-#    def sample(self) -> torch.Tensor:
-#        # TODO: Implement this
-##         sigma = torch.log(1+torch.exp(self.rho))
-#        multi_normal_distribution = torch.distributions.Normal(self.mu, self.sigma)
-#        sample = multi_normal_distribution.sample()
-##         raise NotImplementedError()
-#        return sample
 class MultivariateDiagonalGaussian(ParameterDistribution):
+    """
+    Multivariate diagonal Gaussian distribution,
+    i.e., assumes all elements to be independent Gaussians
+    but with different means and standard deviations.
+    This parameterizes the standard deviation via a parameter rho as
+    sigma = softplus(rho).
+    """
+
     def __init__(self, mu: torch.Tensor, rho: torch.Tensor):
-        super(MultivariateDiagonalGaussian, self).__init__()
+        super(MultivariateDiagonalGaussian, self).__init__()  # always make sure to include the super-class init call!
         assert mu.size() == rho.size()
+        print (mu.size(),rho.size())
         self.mu = mu
         self.rho = rho
+        self.sigma = torch.log(torch.ones_like(mu)+torch.exp(self.rho))
     def log_likelihood(self, values: torch.Tensor) -> torch.Tensor:
-        my_dist = torch.distributions.Normal(self.mu, torch.exp(self.rho))
-        log_prob = my_dist.log_prob(values)
-        return log_prob.sum()
+        # TODO: Implement this
+        multi_normal_distribution = torch.distributions.Normal(self.mu, self.sigma)
+        loglike = multi_normal_distribution.log_prob(values)
+        return loglike.sum()
+
     def sample(self) -> torch.Tensor:
-        return self.mu + torch.randn_like(self.rho) * torch.exp(self.rho)
+        # TODO: Implement this
+#         sigma = torch.log(1+torch.exp(self.rho))
+        multi_normal_distribution = torch.distributions.Normal(self.mu, self.sigma)
+        sample = self.mu + torch.randn_like(self.rho) * self.sigma
+#         raise NotImplementedError()
+        return sample
+#class MultivariateDiagonalGaussian(ParameterDistribution):
+#    def __init__(self, mu: torch.Tensor, rho: torch.Tensor):
+#        super(MultivariateDiagonalGaussian, self).__init__()
+#        assert mu.size() == rho.size()
+#        self.mu = mu
+#        self.rho = rho
+#    def log_likelihood(self, values: torch.Tensor) -> torch.Tensor:
+#        my_dist = torch.distributions.Normal(self.mu, torch.exp(self.rho))
+#        log_prob = my_dist.log_prob(values)
+#        return log_prob.sum()
+#    def sample(self) -> torch.Tensor:
+#        return self.mu + torch.randn_like(self.rho) * torch.exp(self.rho)
 
 
 
