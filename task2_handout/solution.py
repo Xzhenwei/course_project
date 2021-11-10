@@ -57,10 +57,10 @@ class Model(object):
     def __init__(self):
         # Hyperparameters and general parameters
         # You might want to play around with those
-        self.num_epochs = 10  # number of training epochs
+        self.num_epochs = 7  # number of training epochs
         self.batch_size = 128  # training batch size
         learning_rate = 1e-3  # training learning rates
-        hidden_layers = (100, 100)  # for each entry, creates a hidden layer with the corresponding number of units
+        hidden_layers = (128, 64)  # for each entry, creates a hidden layer with the corresponding number of units
         use_densenet = False  # set this to True in order to run a DenseNet for comparison
         self.print_interval = 100  # number of batches until updated metrics are displayed during training
         # Determine network type
@@ -183,11 +183,19 @@ class BayesianLayer(nn.Module):
         #  Example: self.prior = MyPrior(torch.tensor(0.0), torch.tensor(1.0))
         self.prior = None
 
-        a = 0.875
-        b = 1.25
-        self.prior_weight = MultivariateDiagonalGaussian(torch.zeros(in_features * out_features), a*torch.ones(in_features * out_features))
-        self.prior_bias = MultivariateDiagonalGaussian(torch.zeros(out_features),
-            b*torch.ones(out_features))
+        # a = 1
+        # b = 1
+        # self.prior_weight = MultivariateDiagonalGaussian(torch.zeros(in_features * out_features), a*torch.ones(in_features * out_features))
+        # self.prior_bias = MultivariateDiagonalGaussian(torch.zeros(out_features),
+        #     b*torch.ones(out_features))
+
+        PI = 0.25
+        rho1 = 1.7
+        rho2 = 0.01
+        self.prior_weight = ScaleMixtureGaussian(PI, rho1 * torch.ones(out_features * in_features),
+                                                    rho2 * torch.ones(out_features * in_features))
+        self.prior_bias = ScaleMixtureGaussian(PI, rho1 * torch.ones(out_features),
+                                                 rho2 * torch.ones(out_features))
         assert isinstance(self.prior_weight, ParameterDistribution)
         assert isinstance(self.prior_bias, ParameterDistribution)
         assert not any(True for _ in self.prior_weight.parameters()), 'Prior cannot have parameters'
@@ -205,10 +213,8 @@ class BayesianLayer(nn.Module):
         #      torch.nn.Parameter(torch.ones((out_features, in_features)))
         #  )
 #        self.weights_var_posterior = None
-        c = -4
-        self.weights_var_posterior = MultivariateDiagonalGaussian(torch.nn.Parameter(torch.zeros((in_features * out_features))),
-                                                                  torch.nn.Parameter(c * torch.ones((in_features * out_features))))
-
+        self.weights_var_posterior = MultivariateDiagonalGaussian(torch.nn.Parameter(torch.Tensor(out_features * in_features).uniform_(-0.2, 0.2)),
+                                                                  torch.nn.Parameter(torch.Tensor(out_features * in_features).uniform_(-5,-4)))
         
         assert isinstance(self.weights_var_posterior, ParameterDistribution)
         assert any(True for _ in self.weights_var_posterior.parameters()), 'Weight posterior must have parameters'
@@ -217,8 +223,8 @@ class BayesianLayer(nn.Module):
             # TODO: As for the weights, create the bias variational posterior instance here.
             #  Make sure to follow the same rules as for the weight variational posterior.
 #            self.bias_var_posterior = None
-            self.bias_var_posterior = MultivariateDiagonalGaussian(torch.nn.Parameter(torch.zeros((out_features,))),
-                                                                   torch.nn.Parameter(c * torch.ones((out_features,))))
+            self.bias_var_posterior = MultivariateDiagonalGaussian(torch.nn.Parameter(torch.Tensor(out_features).uniform_(-0.2, 0.2)),
+                                                                  torch.nn.Parameter(torch.Tensor(out_features).uniform_(-5,-4)))
             assert isinstance(self.bias_var_posterior, ParameterDistribution)
             assert any(True for _ in self.bias_var_posterior.parameters()), 'Bias posterior must have parameters'
         else:
@@ -342,17 +348,14 @@ class UnivariateGaussian(ParameterDistribution):
         self.sigma = sigma
 
     def log_likelihood(self, values: torch.Tensor) -> torch.Tensor:
-        # TODO: Implement this
         normal_distribution = torch.distributions.Normal(self.mu, self.sigma)
         loglike = normal_distribution.log_prob(values)
         return loglike
 
     def sample(self) -> torch.Tensor:
-        # TODO: Implement this
         normal_distribution = torch.distributions.Normal(self.mu, self.sigma)
         sample = normal_distribution.sample()
         return sample
-#        raise NotImplementedError()
 
 
 
@@ -374,32 +377,49 @@ class MultivariateDiagonalGaussian(ParameterDistribution):
         self.rho = rho
         self.sigma = torch.log(torch.ones_like(mu)+torch.exp(self.rho))
     def log_likelihood(self, values: torch.Tensor) -> torch.Tensor:
-        # TODO: Implement this
         multi_normal_distribution = torch.distributions.Normal(self.mu, self.sigma)
         loglike = multi_normal_distribution.log_prob(values)
         return loglike.sum()
 
     def sample(self) -> torch.Tensor:
-        # TODO: Implement this
-#         sigma = torch.log(1+torch.exp(self.rho))
-        multi_normal_distribution = torch.distributions.Normal(self.mu, self.sigma)
         sample = self.mu + torch.randn_like(self.rho) * self.sigma
-#         raise NotImplementedError()
         return sample
-#class MultivariateDiagonalGaussian(ParameterDistribution):
-#    def __init__(self, mu: torch.Tensor, rho: torch.Tensor):
-#        super(MultivariateDiagonalGaussian, self).__init__()
-#        assert mu.size() == rho.size()
-#        self.mu = mu
-#        self.rho = rho
-#    def log_likelihood(self, values: torch.Tensor) -> torch.Tensor:
-#        my_dist = torch.distributions.Normal(self.mu, torch.exp(self.rho))
-#        log_prob = my_dist.log_prob(values)
-#        return log_prob.sum()
-#    def sample(self) -> torch.Tensor:
-#        return self.mu + torch.randn_like(self.rho) * torch.exp(self.rho)
 
+class ScaleMixtureGaussian(ParameterDistribution):
+    """
+    ScaleMixture Gaussian to implement Spike and Slab model as per Bayes by Backprop paper. Note that this
+    implementation is prone to potential underflow and the computation of the log likelihood is not optimized
+    """
 
+    def __init__(self, pi: float, rho1: torch.Tensor, rho2: torch.Tensor):
+        super(ScaleMixtureGaussian, self).__init__()  # always make sure to include the super-class init call!
+        assert rho1.size() == rho2.size()
+        # Assumes mu and sigmas are 2D (n x m) as per Multivariate Gaussian
+        sigma1 = torch.log(1 + torch.exp(rho1))
+        sigma2 = torch.log(1 + torch.exp(rho2))
+        self.gaussian1 = MultivariateDiagonalGaussian(torch.zeros(sigma1.shape), sigma1)
+        self.gaussian2 = MultivariateDiagonalGaussian(torch.zeros(sigma2.shape), sigma2)
+        self.pi = pi
+
+    def log_likelihood(self, values: torch.Tensor) -> torch.Tensor:
+        # Assumes values are 2D (n x m) as per Multivariate Gaussian
+        log_like_1 = self.gaussian1.log_likelihood(values)
+        log_like_2 = self.gaussian2.log_likelihood(values)
+        if log_like_2 > log_like_1 * 10:
+            log_like = log_like_2
+        elif log_like_1 > log_like_2 * 10:
+            log_like = log_like_1
+        else:
+            offset = (log_like_2 + log_like_1) / 2
+            likelihood = self.pi * torch.exp(log_like_1 - offset) + (1 - self.pi) * torch.exp(log_like_2 - offset)
+            log_like = torch.log(likelihood) + offset
+
+        return log_like
+
+    def sample(self) -> torch.Tensor:
+        eps1 = np.random.normal()
+        eps2 = np.random.normal()
+        return self.mu + self.pi * self.sigma1 * eps1 + (1 - self.pi) * self.sigma2 * eps2
 
 def evaluate(model: Model, eval_loader: torch.utils.data.DataLoader, data_dir: str, output_dir: str):
     """
