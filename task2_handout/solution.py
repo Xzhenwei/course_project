@@ -57,10 +57,10 @@ class Model(object):
     def __init__(self):
         # Hyperparameters and general parameters
         # You might want to play around with those
-        self.num_epochs = 7  # number of training epochs
+        self.num_epochs = 30  # number of training epochs
         self.batch_size = 128  # training batch size
         learning_rate = 1e-3  # training learning rates
-        hidden_layers = (128, 64)  # for each entry, creates a hidden layer with the corresponding number of units
+        hidden_layers = (64, 32)  # for each entry, creates a hidden layer with the corresponding number of units
         use_densenet = False  # set this to True in order to run a DenseNet for comparison
         self.print_interval = 100  # number of batches until updated metrics are displayed during training
         # Determine network type
@@ -117,8 +117,8 @@ class Model(object):
                     assert isinstance(self.network, BayesNet)
                     current_logits, log_prior, log_var_post = self.network(batch_x)
                     nll_loss = F.nll_loss(F.log_softmax(current_logits, dim=1), batch_y, reduction='sum')
-                    # reg_term = (log_var_post - log_prior)
-                    loss = nll_loss #+ reg_term
+                    reg_term = (log_var_post - log_prior)
+                    loss = nll_loss + reg_term
                     loss.backward(retain_graph=True)
                     # TODO: Implement Bayes by backprop training here
 
@@ -190,8 +190,8 @@ class BayesianLayer(nn.Module):
         #     b*torch.ones(out_features))
 
         PI = 0.25
-        rho1 = 1.7
-        rho2 = 0.01
+        rho1 = 2
+        rho2 = 0.001
         self.prior_weight = ScaleMixtureGaussian(PI, rho1 * torch.ones(out_features * in_features),
                                                     rho2 * torch.ones(out_features * in_features))
         self.prior_bias = ScaleMixtureGaussian(PI, rho1 * torch.ones(out_features),
@@ -403,16 +403,12 @@ class ScaleMixtureGaussian(ParameterDistribution):
 
     def log_likelihood(self, values: torch.Tensor) -> torch.Tensor:
         # Assumes values are 2D (n x m) as per Multivariate Gaussian
-        log_like_1 = self.gaussian1.log_likelihood(values)
-        log_like_2 = self.gaussian2.log_likelihood(values)
-        if log_like_2 > log_like_1 * 10:
-            log_like = log_like_2
-        elif log_like_1 > log_like_2 * 10:
-            log_like = log_like_1
-        else:
-            offset = (log_like_2 + log_like_1) / 2
-            likelihood = self.pi * torch.exp(log_like_1 - offset) + (1 - self.pi) * torch.exp(log_like_2 - offset)
-            log_like = torch.log(likelihood) + offset
+        prob1 = self.gaussian1.log_likelihood(values)
+        prob2 = self.gaussian2.log_likelihood(values)
+        if prob2 > prob1 * 10:
+            log_like = prob2
+        elif prob1 > prob2 * 10:
+            log_like = prob1
 
         return log_like
 
