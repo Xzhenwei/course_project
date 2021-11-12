@@ -1,0 +1,5 @@
+In this project, we used Bayesian neural network to predict the numbers with uncertainty. we parametrize weights and the prior bias by scale mixture Gaussians.
+
+On every layer of Bayesian NN, we have parameters over mean and rho of prior weights and prior bias. In each forward passes, we sample the weights from Gaussian and bias and then apply an affine transformation. In the backward pass, we do backpropagation and added the difference between log posterior of variance and log prior. We also implemented a Gaussian mixture on posterior of weights variance.
+
+As for the Bayesian net, we use Bayesian layers with 30 forward passes for each prediction and use the dimension 64x32 of hidden layers since we would like to have some uncertain prediction of the numbers to increase the roboustness.
