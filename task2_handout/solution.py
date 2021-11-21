@@ -57,8 +57,8 @@ class Model(object):
     def __init__(self):
         # Hyperparameters and general parameters
         # You might want to play around with those
-        self.num_epochs = 30  # number of training epochs
-        self.batch_size = 128  # training batch size
+        self.num_epochs = 10  # number of training epochs
+        self.batch_size = 256  # training batch size
         learning_rate = 1e-3  # training learning rates
         hidden_layers = (64, 32)  # for each entry, creates a hidden layer with the corresponding number of units
         use_densenet = False  # set this to True in order to run a DenseNet for comparison
@@ -191,7 +191,7 @@ class BayesianLayer(nn.Module):
 
         PI = 0.25
         rho1 = 2
-        rho2 = 0.001
+        rho2 = 0.0005
         self.prior_weight = ScaleMixtureGaussian(PI, rho1 * torch.ones(out_features * in_features),
                                                     rho2 * torch.ones(out_features * in_features))
         self.prior_bias = ScaleMixtureGaussian(PI, rho1 * torch.ones(out_features),
