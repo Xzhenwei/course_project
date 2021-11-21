@@ -43,7 +43,7 @@ class BO_algo(object):
         if self.previous_points:
             return self.optimize_acquisition_function()
         else:
-            return np.random.rand(1, 2)
+            return np.atleast_2d([3,3])
     def optimize_acquisition_function(self) -> np.ndarray:  # DON'T MODIFY THIS FUNCTION
         """
         Optimizes the acquisition function.
@@ -138,7 +138,10 @@ class BO_algo(object):
         solution: np.ndarray
             1 x domain.shape[0] array containing the optimal solution of the problem
         """
-        x_opt = min([point for point in self.previous_points if point[3] < -0.01], key=lambda x: x[2])[:2]
+        try:
+            x_opt = min([point for point in self.previous_points if point[3] < -0.01], key=lambda x: x[2])[:2]
+        except:
+            x_opt = min([point for point in self.previous_points], key=lambda x: x[3])[:2]
 
         return np.atleast_2d(x_opt)
 
