@@ -43,7 +43,7 @@ class BO_algo(object):
         if self.previous_points:
             return self.optimize_acquisition_function()
         else:
-            return np.atleast_2d([3,3])
+            return np.atleast_2d([3,3]) # start from the middle
     def optimize_acquisition_function(self) -> np.ndarray:  # DON'T MODIFY THIS FUNCTION
         """
         Optimizes the acquisition function.
@@ -91,12 +91,11 @@ class BO_algo(object):
         xi = 0.01 # the exploitation exploration trade off parameter
 
         mu_obj, sig_obj = self.objective_model.predict(np.atleast_2d(x), return_std=True)
+        mu_const, sig_const = self.constraint_model.predict(np.atleast_2d(x), return_std=True)
+
         t = min([point[2] for point in self.previous_points])
         z_obj = (mu_obj - t) / sig_obj #not adding xi here since we dont have to explore
-
-        mu_const, sig_const = self.constraint_model.predict(np.atleast_2d(x), return_std=True)
         p0 = scipy.stats.norm(mu_const, sig_const).cdf(0)
-
         '''
         the probability that c is < 0 should also be taken account
         '''
@@ -138,12 +137,9 @@ class BO_algo(object):
         solution: np.ndarray
             1 x domain.shape[0] array containing the optimal solution of the problem
         """
-        try:
-            x_opt = min([point for point in self.previous_points if point[3] < -0.01], key=lambda x: x[2])[:2]
-        except:
-            x_opt = min([point for point in self.previous_points], key=lambda x: x[3])[:2]
+        solution = min([solutions for solutions in self.previous_points if solutions[3] < -0.001], key=lambda x: x[2])[:2]
 
-        return np.atleast_2d(x_opt)
+        return np.atleast_2d(solution)
 
 
 """ 
