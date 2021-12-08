@@ -106,16 +106,11 @@ class MLPActorCritic(nn.Module):
         # Hint: This function is only called when interacting with the environment. You should use
         # `torch.no_grad` to ensure that it does not interfere with the gradient computation.
         with torch.no_grad():
-            # sample policy
             policy, _ = self.pi.forward(state)
             action = policy.sample()
-
-            # value function at given state
             value = self.v.forward(state)
 
-            return action.item(), value.item(), policy.log_prob(action)
-    def act(self, state):
-        return self.step(state)[0]
+        return action.item(), value.item(), policy.log_prob(action)
 
 
 class VPGBuffer:
@@ -229,12 +224,13 @@ class Agent:
         phi = data['phi']
         ret = data['ret']
         rew = data['rew']
-        self.pi_optimizer.zero_grad() #reset the gradient in the policy optimizer
+        # Before doing any computation, always call.zero_grad on the relevant optimizer
+        self.pi_optimizer.zero_grad()
 
         _, logp_a = self.ac.pi.forward(obs, act)
         value = self.ac.v.forward(obs)
         deltas = rew[:-1] + value[1:] - value[:-1]
-        # discount TD residuals
+
         phi = discount_cumsum(deltas.detach().numpy(), gamma*lam)
         phi = torch.Tensor((phi - phi.mean()) / phi.std())
 
@@ -246,14 +242,12 @@ class Agent:
         # mean reward baseline
         b = rew.mean()
 
-        #pi_loss = -(logp_a * (data['ret'] - mor)).sum()
         pi_loss = -(logp_a[1:] * phi).sum()
         pi_loss.backward()
         self.pi_optimizer.step()
 
 
-        # Before doing any computation, always call.zero_grad on the relevant optimizer
-#        self.pi_optimizer.zero_grad()
+        
 
         #Hint: you need to compute a 'loss' such that its derivative with respect to the policy
         #parameters is the policy gradient. Then call loss.backwards() and pi_optimizer.step()
@@ -279,21 +273,17 @@ class Agent:
         self.v_optimizer.zero_grad()
         for _ in range(100):
             self.v_optimizer.zero_grad()
-            #compute a loss for the value function, call loss.backwards() and then
-            value = self.ac.v.forward(data['obs'])
+            value = self.ac.v.forward(obs)
             deltas = rew[:-1] + value[1:] - value[:-1]
-            # do the discounting
             phi = torch.zeros_like(deltas)
             for i in reversed(range(phi.shape[0])):
                 phi[i] = gamma*lam * torch.sum(deltas[i:deltas.shape[0]])
-            # standardize
+
             phi = (phi - phi.mean()) / phi.std()
             v_loss = (0.5 * phi**2).sum()
-            #v_loss = ((value - data['rew'])**2).mean()
-            #v_loss = F.smooth_l1_loss(value, data['rew'])
+            
             v_loss.backward()
             self.v_optimizer.step()
-
         return
 
     def train(self):
@@ -387,7 +377,8 @@ class Agent:
         """
         # TODO3: Implement this function.
         # Currently, this just returns a random action.
-        a = self.ac.act(torch.as_tensor(obs, dtype=torch.float32))
+        b = torch.as_tensor(obs, dtype=torch.float32)
+        a = self.ac.step(b)[0]
         return a
 
 
